@@ -1,9 +1,9 @@
-# OS_4
+# OS_5
 
-Alon Barak & Idan Philosof. <br>
+Alon Barak & Idan Philosoph. <br>
 
 The fourth assignment of the Operating Systems Course.<br>
-This repo contains an implementation of a multithreaded server which serves as a stack to its client.<br>
+This repo contains an implementation of a forked server which serves as a stack to its client.<br>
 In this project we were inspired by https://github.com/andrestc/linux-prog/blob/master/ch7/malloc.c repo,<br>
 for the Malloc and Free functions.<br>
 
