@@ -4,7 +4,7 @@ HEADER	= stack.hpp
 OUT	= server
 CC	 = g++
 FLAGS	 = -g -c -Wall
-LFLAGS	 = -lpthread
+LFLAGS	 = -lpthread -lrt
 
 all: server client test 
 

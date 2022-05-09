@@ -18,7 +18,10 @@
 #include "stack.hpp"
 #include <iostream>       // std::cout
 #include <mutex>          // std::mutex
-//#include <tbb/mutex.h>  // tbb:mutex
+#include <sys/mman.h>   // mmap
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <semaphore.h>
 
 #define PORT "3490"  // the port users will be connecting to
 
@@ -118,7 +121,25 @@ int main(void)
     char s[INET6_ADDRSTRLEN];
     int rv;
     
-    pnode head = NULL;      // head of the stack
+    // shared memory
+    int fd_ = shm_open("stack_shared_memry", O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+    ftruncate(fd_, sizeof(node) * 50);
+
+    pnode head = (pnode)mmap(
+        NULL,
+        sizeof(node)*50,
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED,
+        fd_,
+        0
+    );      // head of the stack
+    if (head == MAP_FAILED)
+    {
+        perror("COULD NOT MMAP");
+        return -1;
+    }
+    
+    head = NULL;
 
 
     memset(&hints, 0, sizeof hints);
