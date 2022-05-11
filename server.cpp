@@ -22,13 +22,14 @@
 #include <fcntl.h>
 #include <semaphore.h>
 
-#define PORT "3490"  // the port users will be connecting to
+#define PORT "3500"  // the port users will be connecting to
 
 #define BACKLOG 10   // how many pending connections queue will hold
 
 struct arg_struct {
     int arg1;
     pnode *head;
+    int ** size;
 };
 
 
@@ -40,7 +41,6 @@ void* _calloc(size_t size);
 void _free(void *address);
 
 static pthread_mutex_t lock;        // mutex lock -> QUES 6
-
 
 void sigchld_handler(int s)
 {
@@ -63,13 +63,10 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-void *send_to_user(void *args)
+void *send_to_user(pnode * head, int ** size, int new_fd)
 {
     
-    struct arg_struct *argss = (struct arg_struct *)args;
-    int new_fd = argss->arg1;
-    
-    sleep(5);
+    sleep(2);
     char buffer[1024] = {0};
     while(true){
         read(new_fd, buffer, 1024);
@@ -77,15 +74,16 @@ void *send_to_user(void *args)
         {
             // the PUSH command is executed
             pthread_mutex_lock(&lock);
-            push(argss->head, buffer+5);  // push the input of the buffer into the stack
+            strcpy(head[**size]->data, buffer+5);
+            (**size) = (**size) + 1;
             pthread_mutex_unlock(&lock);
         }
         else if (strncmp(buffer, "TOP",3) == 0)
         {
             // the POP command is executed
             pthread_mutex_lock(&lock);
-            char* str;
-            if((str = top(argss->head)) == NULL){
+            char* str = head[**size-1]->data;
+            if(**size == 0){
                 char emp[2] = {'-', '\0'};
                 send(new_fd, emp, strlen(emp),0);
             }
@@ -98,7 +96,8 @@ void *send_to_user(void *args)
         {
             // the POP command is executed
             pthread_mutex_lock(&lock);
-            pop(argss->head);     // pop the last node from the stack
+            strcpy(head[**size-1]->data, "");
+            (**size) = (**size) - 1;
             pthread_mutex_unlock(&lock);
         }
         else if (strncmp(buffer, "EXIT",4) == 0){
@@ -122,27 +121,31 @@ int main(void)
     int yes=1;
     char s[INET6_ADDRSTRLEN];
     int rv;
-    
-    // shared memory
-    int fd_ = shm_open("stack_shared_memry", O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
-    ftruncate(fd_, sizeof(node) * 50);
+    pnode head;
+    int *size;
 
-    pnode head = (pnode)mmap(
+    // stack using mmap
+    head = (pnode) mmap(
         NULL,
-        sizeof(node)*50,
+        sizeof(node)*1000,
         PROT_READ | PROT_WRITE,
-        MAP_SHARED,
-        fd_,
+        MAP_SHARED | MAP_ANONYMOUS,
+        -1,
         0
-    );      // head of the stack
-    if (head == MAP_FAILED)
-    {
-        perror("COULD NOT MMAP");
-        return -1;
-    }
+    );
     
-    head = NULL;
+    size = (int*) mmap(
+        NULL,
+        sizeof(int),
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED | MAP_ANONYMOUS,
+        -1,
+        0
+    );
+    *size = 0;      // size of the current stack, will use as a pointer to the shared memory
 
+    strcpy(head->data, "EMPTY");
+    head->next = head + sizeof(node);
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -217,13 +220,10 @@ int main(void)
         if (c_pid == -1) {
             perror("fork");
             exit(EXIT_FAILURE);
-        } else if (c_pid <= 0) {
-            struct arg_struct args;
-            args.arg1 = new_fd;
-            args.head = &head;
-            send_to_user((void*)&args);
-            exit(EXIT_SUCCESS);
+        } else if (c_pid == 0) {
+            send_to_user(&head, &size, new_fd);
         }
+        close(new_fd);
     }
 
     return 0;

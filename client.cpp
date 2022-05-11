@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <string>
 #include <iostream>
-#define PORT 3490
+#define PORT 3500
 
 using namespace std;
 

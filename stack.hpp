@@ -1,12 +1,13 @@
 #ifndef STACK_
 #define STACK_
-
+#include <cstddef>
 
 
 typedef struct stack_node
 {
-    char* data;
+    char data[1024];
     struct stack_node *next;
+
 } node, *pnode;
 
 void push(pnode *head, char data[1024]); // push -> receives head of stack (double pointer) & data array

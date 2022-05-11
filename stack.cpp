@@ -1,6 +1,5 @@
 #include "stack.hpp"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -87,14 +86,14 @@ void push(pnode *head, char data[1024]){
     if (*head == NULL)
     {
         *head = (pnode) _malloc(sizeof(node));
-        (*head)->data = (char*) _malloc(sizeof(char)*1024);
+        // (*head)->data = (char*) _malloc(sizeof(char)*1024);
         memcpy((*head)->data,data, strlen(data));
         (*head)->next = NULL;
     }
     else
     {
         pnode new_node = (pnode) _malloc(sizeof(node));      // dynamic allocation
-        new_node->data = (char*) _malloc(sizeof(char)*1024);
+        // new_node->data = (char*) _malloc(sizeof(char)*1024);
         memcpy(new_node->data,data, strlen(data));
         new_node->next = NULL;
         pnode *ptr = head;  //temporary pointer
