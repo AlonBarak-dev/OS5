@@ -21,8 +21,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <semaphore.h>
+#include <fcntl.h>
 
-#define PORT "3516"  // the port users will be connecting to
+#define PORT "3600"  // the port users will be connecting to
 
 #define BACKLOG 10   // how many pending connections queue will hold
 
@@ -40,7 +41,6 @@ void* _malloc(size_t size);
 void* _calloc(size_t size);
 void _free(void *address);
 
-static pthread_mutex_t lock;        // mutex lock -> QUES 6
 
 void sigchld_handler(int s)
 {
@@ -74,7 +74,8 @@ int main(void)
     int yes=1;
     char s[INET6_ADDRSTRLEN];
     int rv;
-    pnode head;
+
+    pnode head;     // the head of the stack
     int *size;
 
     // stack using mmap
@@ -97,9 +98,10 @@ int main(void)
     );
     *size = 0;      // size of the current stack, will use as a pointer to the shared memory
 
-    strcpy(head->data, "EMPTY");
-    head->next = head + sizeof(node);
+    int fd = open("lock_file.txt", O_RDWR);
+    struct flock flock;     // fcntl lock 
 
+    memset(&flock, 0, sizeof(flock));     // reset the lock
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -140,7 +142,7 @@ int main(void)
         exit(1);
     }
 
-    if (listen(sockfd, BACKLOG) == -1) {
+    if (listen(sockfd, BACKLOG) == -1) {        // BACKLOG = 10
         perror("listen");
         exit(1);
     }
@@ -156,8 +158,11 @@ int main(void)
     printf("server: waiting for connections...\n");
 
     while(1) {  // main accept() loop
+
         sin_size = sizeof their_addr;
+        // wait for new connections
         new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+        // in case the connection failed
         if (new_fd == -1) {
             perror("accept");
             continue;
@@ -168,60 +173,79 @@ int main(void)
             s, sizeof s);
         printf("server: got connection from %s\n", s);
 
+        // fork the process
         pid_t c_pid = fork();
 
         if (c_pid == -1) {
+            // in case the fork failed
             perror("fork");
             exit(EXIT_FAILURE);
-        } else if (c_pid == 0) {
-            //send_to_user(&head, &size, new_fd);
-            sleep(2);
+        } 
+        else if (c_pid == 0) {
+            // CHILD PROCESS
+            
+            sleep(1);
+            // create a buffer of size 1K 
             char buffer[1024] = {0};
+
+            // run until an exit call
             while(true){
+
                 read(new_fd, buffer, 1024);
-                if (strncmp(buffer, "PUSH ",5) == 0)
+                // lock the fcntl lock
+                (flock).l_type = F_WRLCK;
+                fcntl(fd, F_SETLKW, &flock);
+
+                if (strncmp(buffer, "EXIT",4) == 0){
+                    // if the client decided to exit, break out!
+                    printf("Connection stopped from one client\n");
+                    break;
+                }
+                else if (strncmp(buffer, "PUSH ",5) == 0)
                 {
                     // the PUSH command is executed
-                    pthread_mutex_lock(&lock);
+
                     int len = *size;
-                    pnode ptr = &(head[len]);
+                    // copy the content into a stack node 
                     strcpy(head[len].data, buffer+5);
+                    // increase the size of the stack by 1
                     *size = len + 1; 
-                    pthread_mutex_unlock(&lock);
-                }
-                else if (strncmp(buffer, "TOP",3) == 0)
-                {
-                    // the POP command is executed
-                    pthread_mutex_lock(&lock);
-                    int len = (*size) - 1;
-                    pnode ptr = &(head[len]);
-                    char* str = (*ptr).data;
-                    if(*size == 0){
-                        char emp[2] = {'-', '\0'};
-                        send(new_fd, emp, strlen(emp),0);
-                    }
-                    else if(send(new_fd, str, strlen(str),0) == -1){
-                        perror("send error!");
-                    }
-                    pthread_mutex_unlock(&lock);
                 }
                 else if (strncmp(buffer, "POP",3) == 0)
                 {
                     // the POP command is executed
-                    pthread_mutex_lock(&lock);
+
                     int len = (*size) - 1;
-                    pnode ptr = &(head[len]);
+                    // clear the data at the last stack's node
                     strcpy(head[len].data, "");
+                    // decrease the stack size
                     *size = len;
-                    pthread_mutex_unlock(&lock);
                 }
-                else if (strncmp(buffer, "EXIT",4) == 0){
-                    printf("Connection stopped from one client\n");
-                    break;
+                else if (strncmp(buffer, "TOP",3) == 0)
+                {
+                    // the POP command is executed
+
+                    int len = (*size) - 1;
+                    // copy the last stacks node's data into a pointer
+                    char* str = (head[len]).data;
+                    // if the stack is empty then return a string symbolise that the stack is empty
+                    if(*size == 0){
+                        char emp[2] = {'-', '\0'};
+                        send(new_fd, emp, strlen(emp),0);
+                    }
+                    // if the stack is not empty send the content
+                    else if(send(new_fd, str, strlen(str),0) == -1){
+                        perror("send error!");
+                    }
                 }
+                // reset the buffer to zero
                 bzero(buffer, 1024);
+                // unlock the fcntl lock
+                (flock).l_type = F_UNLCK;
+                fcntl(fd, F_SETLKW, &flock);
             }
         }
+        // close the socket
         close(new_fd);
     }
 

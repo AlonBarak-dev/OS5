@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/mman.h>   // mmap
+#include <fcntl.h>
 
 // UESD THIS GITHUB ACCOUNT : https://github.com/andrestc/linux-prog/blob/master/ch7/malloc.c and 
 // https://stackoverflow.com/a/12773678
@@ -17,14 +18,18 @@ typedef struct alloc {
 
 } alloc;
 
-static pthread_mutex_t mutex;
+int fd = open("lock_file.txt", O_RDWR);
+struct flock flock;     // fcntl lock 
+//memset(&flock,0,sizeof(flock));
 static alloc root_of_allocation_table = {0, 0};
 static const size_t align_to = 16;
 
 void* _malloc(size_t size) {
 
     printf("DEBUG: Using Malloc! \n");
-
+    // lock the fcntl lock
+    (flock).l_type = F_WRLCK;
+    fcntl(fd, F_SETLKW, &flock);
     size = (size + sizeof(alloc) + (align_to - 1)) & ~ (align_to - 1);		// define the size needed for the object
     alloc* block = root_of_allocation_table.next;	
     alloc** head = &(root_of_allocation_table.next);
@@ -49,6 +54,9 @@ void* _malloc(size_t size) {
         0
     );
     block->size = size;
+    // unlock the fcntl lock
+    (flock).l_type = F_UNLCK;
+    fcntl(fd, F_SETLKW, &flock);
     return ((char*)block) + sizeof(alloc);
 }
 
@@ -58,8 +66,14 @@ void *_calloc(size_t size)
 {	
     printf("DEBUG: Using Calloc! \n");
 	// use malloc and reset the located memory
+    // lock the fcntl lock
+    (flock).l_type = F_WRLCK;
+    fcntl(fd, F_SETLKW, &flock);
 	void *ptr = _malloc(size);
 	memset(ptr, 0, size);
+    // unlock the fcntl lock
+    (flock).l_type = F_UNLCK;
+    fcntl(fd, F_SETLKW, &flock); 
 	return ptr;
 }
 
@@ -70,21 +84,19 @@ void _free(void *address)
 	if (address == NULL)
 		return;
     
-	pthread_mutex_lock(&mutex);
+    // lock the fcntl lock
+    (flock).l_type = F_WRLCK;
+    fcntl(fd, F_SETLKW, &flock);
 
 	alloc* block = (alloc*)(((char*)address) - sizeof(alloc));
 	block->next = root_of_allocation_table.next;
 	root_of_allocation_table.next = block;
+    // unlock the fcntl lock
+    (flock).l_type = F_UNLCK;
+    fcntl(fd, F_SETLKW, &flock);
 
-    pthread_mutex_unlock(&mutex);
 }
 
-void init()
-{
-	if (pthread_mutex_init(&mutex, NULL) != 0) {
-		perror("\n *alloc mutex init has failed*\n");
-	}	
-}
 
 /*
 ~~~~~~~~~~~ STACK FUNCTIONS ~~~~~~~~~~~~~
