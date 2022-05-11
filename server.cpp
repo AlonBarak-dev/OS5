@@ -22,7 +22,7 @@
 #include <fcntl.h>
 #include <semaphore.h>
 
-#define PORT "3500"  // the port users will be connecting to
+#define PORT "3516"  // the port users will be connecting to
 
 #define BACKLOG 10   // how many pending connections queue will hold
 
@@ -63,53 +63,6 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-void *send_to_user(pnode * head, int ** size, int new_fd)
-{
-    
-    sleep(2);
-    char buffer[1024] = {0};
-    while(true){
-        read(new_fd, buffer, 1024);
-        if (strncmp(buffer, "PUSH ",5) == 0)
-        {
-            // the PUSH command is executed
-            pthread_mutex_lock(&lock);
-            strcpy(head[**size]->data, buffer+5);
-            (**size) = (**size) + 1;
-            pthread_mutex_unlock(&lock);
-        }
-        else if (strncmp(buffer, "TOP",3) == 0)
-        {
-            // the POP command is executed
-            pthread_mutex_lock(&lock);
-            char* str = head[**size-1]->data;
-            if(**size == 0){
-                char emp[2] = {'-', '\0'};
-                send(new_fd, emp, strlen(emp),0);
-            }
-            else if(send(new_fd, str, strlen(str),0) == -1){
-                perror("send error!");
-            }
-            pthread_mutex_unlock(&lock);
-        }
-        else if (strncmp(buffer, "POP",3) == 0)
-        {
-            // the POP command is executed
-            pthread_mutex_lock(&lock);
-            strcpy(head[**size-1]->data, "");
-            (**size) = (**size) - 1;
-            pthread_mutex_unlock(&lock);
-        }
-        else if (strncmp(buffer, "EXIT",4) == 0){
-            printf("Connection stopped from one client\n");
-            break;
-        }
-        bzero(buffer, 1024);
-    }
-    
-    close(new_fd);
-    return NULL;
-}
 
 int main(void)
 {
@@ -221,7 +174,53 @@ int main(void)
             perror("fork");
             exit(EXIT_FAILURE);
         } else if (c_pid == 0) {
-            send_to_user(&head, &size, new_fd);
+            //send_to_user(&head, &size, new_fd);
+            sleep(2);
+            char buffer[1024] = {0};
+            while(true){
+                read(new_fd, buffer, 1024);
+                if (strncmp(buffer, "PUSH ",5) == 0)
+                {
+                    // the PUSH command is executed
+                    pthread_mutex_lock(&lock);
+                    int len = *size;
+                    pnode ptr = &(head[len]);
+                    strcpy(head[len].data, buffer+5);
+                    *size = len + 1; 
+                    pthread_mutex_unlock(&lock);
+                }
+                else if (strncmp(buffer, "TOP",3) == 0)
+                {
+                    // the POP command is executed
+                    pthread_mutex_lock(&lock);
+                    int len = (*size) - 1;
+                    pnode ptr = &(head[len]);
+                    char* str = (*ptr).data;
+                    if(*size == 0){
+                        char emp[2] = {'-', '\0'};
+                        send(new_fd, emp, strlen(emp),0);
+                    }
+                    else if(send(new_fd, str, strlen(str),0) == -1){
+                        perror("send error!");
+                    }
+                    pthread_mutex_unlock(&lock);
+                }
+                else if (strncmp(buffer, "POP",3) == 0)
+                {
+                    // the POP command is executed
+                    pthread_mutex_lock(&lock);
+                    int len = (*size) - 1;
+                    pnode ptr = &(head[len]);
+                    strcpy(head[len].data, "");
+                    *size = len;
+                    pthread_mutex_unlock(&lock);
+                }
+                else if (strncmp(buffer, "EXIT",4) == 0){
+                    printf("Connection stopped from one client\n");
+                    break;
+                }
+                bzero(buffer, 1024);
+            }
         }
         close(new_fd);
     }

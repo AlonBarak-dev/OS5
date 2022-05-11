@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <sys/mman.h>   // mmap
 
 // UESD THIS GITHUB ACCOUNT : https://github.com/andrestc/linux-prog/blob/master/ch7/malloc.c and 
 // https://stackoverflow.com/a/12773678
@@ -37,8 +38,16 @@ void* _malloc(size_t size) {
         head = &(block->next);
         block = block->next;
     }
+    
 	// in case there is no free space, create one
-    block = (alloc*)sbrk(size);
+    block = (alloc*)mmap(
+        NULL,
+        size,
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED | MAP_ANONYMOUS,
+        -1,
+        0
+    );
     block->size = size;
     return ((char*)block) + sizeof(alloc);
 }
