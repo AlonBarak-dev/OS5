@@ -75,6 +75,10 @@ int main(void)
     char s[INET6_ADDRSTRLEN];
     int rv;
 
+    int fd = open("lock_file.txt", O_RDWR);
+    struct flock flock;     // fcntl lock 
+
+
     pnode head;     // the head of the stack
     int *size;
 
@@ -98,11 +102,10 @@ int main(void)
     );
     *size = 0;      // size of the current stack, will use as a pointer to the shared memory
 
-    int fd = open("lock_file.txt", O_RDWR);
-    struct flock flock;     // fcntl lock 
 
     memset(&flock, 0, sizeof(flock));     // reset the lock
     memset(&hints, 0, sizeof hints);
+    
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
@@ -217,7 +220,7 @@ int main(void)
 
                     int len = (*size) - 1;
                     // clear the data at the last stack's node
-                    strcpy(head[len].data, "");
+                    strcpy(head[len].data, "\0");
                     // decrease the stack size
                     *size = len;
                 }
@@ -248,6 +251,5 @@ int main(void)
         // close the socket
         close(new_fd);
     }
-
     return 0;
 }
