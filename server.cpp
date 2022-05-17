@@ -85,7 +85,7 @@ int main(void)
     // stack using mmap
     head = (pnode) mmap(
         NULL,
-        sizeof(node)*1000,
+        sizeof(node)*10000,
         PROT_READ | PROT_WRITE,
         MAP_SHARED | MAP_ANONYMOUS,
         -1,

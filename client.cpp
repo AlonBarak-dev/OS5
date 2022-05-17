@@ -41,7 +41,7 @@ int main(int argc, char const* argv[])
 		return -1;
 	}
     char command[1024] = {0};
-	sleep(3);
+	sleep(1);
     while (true)
     {
         printf("Please enter a command:\n");
