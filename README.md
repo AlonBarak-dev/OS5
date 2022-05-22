@@ -32,7 +32,22 @@ $ ./client 127.0.0.1
 
 - Please noitce that the server is listen on port 3600 at 127.0.0.1 
 
-- P.S. The client connect directly to the server and no work should be done by the user!
+- P.S. The client connect directly to the server and no work should be done by the user! <br>
+
+## Test: <br>
+
+1.Compile the code : 
+```ruby
+$ make all
+```
+2. Run the Test:
+```ruby
+$ ./test
+```
+3. Stop the server when done:
+```ruby
+$ ctrl + c
+```
 
 ## More Information: <br>
 
