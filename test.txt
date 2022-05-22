@@ -1,0 +1,15 @@
+PUSH ALON
+
+PUSH BARAK
+
+TOP
+
+POP
+
+TOP
+
+EXIT
+
+EXIT 
+
+EXIT
